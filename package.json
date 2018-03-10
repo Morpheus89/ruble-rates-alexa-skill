@@ -1,19 +1,20 @@
 {
-  "name": "polly",
-  "description": "Basic alexa skill that displays current Russian ruble rates/",
-  "version": "0.0.1",
-  "license": "MIT",
-  "dependencies": {
-    "alexa-sdk": "^1.0.25",
-    "aws-sdk": "^2.206.0",
-    "config": "^1.30.0",
-    "request": "^2.83.0"
-  },
-  "scripts": {
-    "deploy": "yarn copy-files; yarn make-zip; yarn upload; yarn rm-zip",
-    "copy-files": "rm -rf dist/*; cp -r src/* dist; cp -r node_modules dist/; cp package.json dist/",
-    "rm-zip": "rm lambda.zip",
-    "make-zip": "cd dist; zip -r ../lambda.zip *; cd -",
-    "upload": "aws lambda update-function-code --function-name rubleRates --zip-file fileb://lambda.zip"
-  }
+    "name": "polly",
+    "description": "Basic alexa skill that displays current Russian ruble rates/",
+    "version": "0.0.1",
+    "license": "MIT",
+    "dependencies": {
+        "alexa-sdk": "^1.0.25",
+        "aws-sdk": "^2.206.0",
+        "config": "^1.30.0",
+        "moment": "^2.21.0",
+        "request": "^2.83.0"
+    },
+    "scripts": {
+        "deploy": "yarn copy-files; yarn make-zip; yarn upload; yarn rm-zip",
+        "copy-files": "rm -rf dist/*; cp -r src/* dist; cp -r node_modules dist/; cp package.json dist/; cp -r config dist/",
+        "rm-zip": "rm lambda.zip",
+        "make-zip": "cd dist; zip -r ../lambda.zip *; cd -",
+        "upload": "aws lambda update-function-code --function-name rubleRates --zip-file fileb://lambda.zip"
+    }
 }

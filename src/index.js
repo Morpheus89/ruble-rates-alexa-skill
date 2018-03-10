@@ -1,8 +1,8 @@
 const Alexa = require('alexa-sdk')
 const AWS = require('aws-sdk')
-const polly = new AWS.Polly()
 const config = require('config')
 const request = require('request')
+const moment = require('moment')
 
 const makePlainText = Alexa.utils.TextUtils.makePlainText
 const makeImage = Alexa.utils.ImageUtils.makeImage
@@ -15,14 +15,9 @@ const HELP_MESSAGE = 'Say open ruble rates'
 const HELP_REPROMPT = 'What can I help you with?'
 const STOP_MESSAGE = 'Goodbye!'
 
-// check if Dynamo has link to audio
-// if link => generate response
-// if no link => get quotes
-// generate all currencies
-// generate response string
-// invoke polly and save audio to s3 "20180309.mp3"
-// on success save link to dynamo
-// generate response
+const Polly = new AWS.Polly()
+const S3 = new AWS.S3()
+const DynamoDB = new AWS.DynamoDB()
 
 /*-----------------------------------------------------------------------------
  *  API requests
@@ -38,6 +33,71 @@ const getRatesFromAPI = function() {
                 }
             }
         )
+    })
+}
+
+// Gets item from DynamoDB using Key
+const getItemFromDynamo = function(item) {
+    var params = {
+        Key: item,
+        TableName: config.get('dynamoDBTableName'),
+    }
+
+    return new Promise((resolve, reject) => {
+        DynamoDB.getItem(params, function(err, data) {
+            if (err) console.log(err, err.stack)
+            else resolve(data)
+        })
+    })
+}
+
+// Uploads item to DynamoDB storage
+const putItemToDynamo = function(item) {
+    var params = {
+        Item: item,
+        // ReturnConsumedCapacity: 'TOTAL',
+        TableName: config.get('dynamoDBTableName'),
+    }
+
+    return new Promise(resolve => {
+        DynamoDB.putItem(params, function(err, data) {
+            if (err) console.log(err, err.stack)
+            else resolve(data)
+        })
+    })
+}
+
+// Returns uploaded file location URL
+const uploadFileToS3 = function(stream) {
+    const params = {
+        ACL: 'public-read',
+        Bucket: config.get('s3BucketName'),
+        Key: `briefings/${moment().format('YYYYMMDD')}.mp3`,
+        Body: stream,
+    }
+
+    return new Promise(resolve => {
+        S3.upload(params, function(err, data) {
+            if (err) console.log(err, err.stack)
+            else resolve(data.Location)
+        })
+    })
+}
+
+const synthesizeSpeech = function(text) {
+    var params = {
+        OutputFormat: 'mp3',
+        SampleRate: '16000',
+        Text: text,
+        TextType: 'text',
+        VoiceId: 'Maxim',
+    }
+
+    return new Promise(resolve => {
+        Polly.synthesizeSpeech(params, function(err, data) {
+            if (err) console.log(err, err.stack)
+            else resolve(data.AudioStream)
+        })
     })
 }
 
@@ -59,89 +119,73 @@ const roundCurrencyRate = function(rate) {
     return Math.round(rate * 100) / 100
 }
 
-const generateSpeechURL = function(text) {
-    // var params = {
-    // };
-    // polly.listLexicons(params, function(err, data) {
-    //   if (err) console.log(err, err.stack); // an error occurred
-    //   else     console.log(data);           // successful response
-    //   /*
-    //   data = {
-    //    Lexicons: [
-    //       {
-    //      Attributes: {
-    //       Alphabet: "ipa",
-    //       LanguageCode: "en-US",
-    //       LastModified: <Date Representation>,
-    //       LexemesCount: 1,
-    //       LexiconArn: "arn:aws:polly:us-east-1:123456789012:lexicon/example",
-    //       Size: 503
-    //      },
-    //      Name: "example"
-    //     }
-    //    ]
-    //   }
-    //   */
-    // });
+const randomGreeting = function(time) {
+    const greetings = config.get('greetings')
+    return greetings[Math.floor(Math.random() * greetings.length)]
+}
 
-    var params = {
-        // LexiconNames: ['example'],
-        OutputFormat: 'json',
-        SampleRate: '8000',
-        Text: text,
-        TextType: 'text',
-        VoiceId: 'Maxim',
-    }
-    polly.synthesizeSpeech(params, function(err, data) {
-        if (err)
-            console.log(err, err.stack) // an error occurred
-        else console.log(data) // successful response
-        /*
-         data = {
-          AudioStream: <Binary String>, 
-          ContentType: "audio/mpeg", 
-          RequestCharacters: 37
-         }
-         */
-    })
+const randomWish = function(time) {
+    const wishes = config.get('wishes')
+    return wishes[Math.floor(Math.random() * wishes.length)]
+}
+
+const generateSpeechString = function(greeting, rates, wish) {
+    return `${greeting} Курс доллара составляет ${rates.USD}, евро ${rates.EUR}, юани ${
+        rates.CNY
+    }. ${wish}`
 }
 
 const handlers = {
     LaunchRequest: function() {
         this.emit('GetRatesIntent')
     },
+
     GetRatesIntent: function() {
-        const imageObj = {
-            smallImageUrl: 'https://',
-            largeImageUrl: 'https://',
-        }
-
-        const builder = new Alexa.templateBuilders.BodyTemplate1Builder()
-
-        getRatesFromAPI().then(response => {
-            const rates = calcCurrencyRates(response.rates)
-
-            const template = builder
-                .setTitle('Hello')
-                .setBackgroundImage(makeImage('https://'))
-                .setTextContent(makePlainText('Hi'))
-                .build()
-
-            this.response
-                .speak('Ok')
-                // .audioPlayerPlay(
-                //     'REPLACE_ALL',
-                //     'https://s3.eu-central-1.amazonaws.com/ruble-rates-assets/briefings/hello.mp3',
-                //     'myAnswer'
-
-                //     // 'expectedPreviousToken',
-                //     // 0
-                // )
-                .cardRenderer('Title', JSON.stringify(rates), imageObj)
-                .renderTemplate(template)
-
-            this.emit(':responseReady')
+        // check if Dynamo has link to audio
+        getItemFromDynamo({
+            id: {
+                S: moment().format('YYYYMMDD'),
+            },
         })
+            .then(item => {
+                return new Promise(resolve => {
+                    if (item.Item) {
+                        // audio file has already been generated
+                        let audioURL = item.Item.url.S
+                        resolve(audioURL)
+                    } else {
+                        // no audio for current date
+                        getRatesFromAPI()
+                            .then(apiResponse => {
+                                console.log('---', 'got from api')
+                                // generate all currencies
+                                return Promise.resolve(calcCurrencyRates(apiResponse.rates))
+                            })
+                            .then(rates =>
+                                generateSpeechString(randomGreeting(), rates, randomWish())
+                            )
+                            // generate audio using Polly API
+                            .then(synthesizeSpeech)
+                            .then(uploadFileToS3)
+                            .then(audioURL => {
+                                putItemToDynamo({
+                                    id: {
+                                        S: moment().format('YYYYMMDD'),
+                                    },
+                                    url: {
+                                        S: audioURL,
+                                    },
+                                })
+
+                                resolve(audioURL)
+                            })
+                    }
+                })
+            })
+            .then(audioURL => {
+                this.response.audioPlayerPlay('REPLACE_ALL', audioURL, 'audio')
+                this.emit(':responseReady')
+            })
     },
     'AMAZON.HelpIntent': function() {
         const speechOutput = HELP_MESSAGE
