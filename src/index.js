@@ -130,10 +130,14 @@ const randomWish = function(time) {
 }
 
 const generateSpeechString = function(greeting, rates, wish) {
-    return `${greeting} Курс доллара составляет ${rates.USD}, евро ${rates.EUR}, юани ${
+    return `${greeting}. Курс доллара составляет ${rates.USD}, евро ${rates.EUR}, юани ${
         rates.CNY
     }. ${wish}`
 }
+
+/*-----------------------------------------------------------------------------
+ *  Handlers
+ *----------------------------------------------------------------------------*/
 
 const handlers = {
     LaunchRequest: function() {
@@ -186,6 +190,34 @@ const handlers = {
                 this.response.audioPlayerPlay('REPLACE_ALL', audioURL, 'audio')
                 this.emit(':responseReady')
             })
+
+        // const imageObj = {
+        //     smallImageUrl: 'https://',
+        //     largeImageUrl: 'https://',
+        // }
+
+        // const builder = new Alexa.templateBuilders.BodyTemplate1Builder()
+        // console.log('---', 'get from api')
+
+        // const template = builder
+        //     .setTitle('Ruble Rates')
+        //     // .setBackgroundImage(makeImage('https://'))
+        //     .setTextContent(makePlainText('hi'))
+        //     .build()
+
+        // this.response
+        //     .speak('Ok')
+        //     .audioPlayerPlay(
+        //         'REPLACE_ALL',
+        //         'https://s3.eu-central-1.amazonaws.com/ruble-rates-assets/briefings/hello.mp3',
+        //         'myAnswer'
+
+        //         //     // 'expectedPreviousToken',
+        //         //     // 0
+        //     )
+        // .cardRenderer('Title', JSON.stringify(rates))
+        // .renderTemplate(template)
+        // console.log('---', 'response ready')
     },
     'AMAZON.HelpIntent': function() {
         const speechOutput = HELP_MESSAGE
