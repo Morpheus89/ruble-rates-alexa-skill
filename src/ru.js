@@ -1,3 +1,18 @@
+const numbers = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять']
+
+const numbersAlter = [
+    '',
+    'одна',
+    'две',
+    'три',
+    'четыре',
+    'пять',
+    'шесть',
+    'семь',
+    'восемь',
+    'девять',
+]
+
 const numbersTens = [
     '',
     'десять',
@@ -22,21 +37,6 @@ const numbersUpTo20 = [
     'семнадцать',
     'восемнадцать',
     'девятнадцать',
-]
-
-const numbers = ['', 'один', 'два', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь', 'девять']
-
-const numbersAlter = [
-    '',
-    'одна',
-    'две',
-    'три',
-    'четыре',
-    'пять',
-    'шесть',
-    'семь',
-    'восемь',
-    'девять',
 ]
 
 const rublePronunciation = num => {
@@ -111,6 +111,4 @@ const kopeckPronunciation = num => {
     return result
 }
 
-for (i = 0; i < 100; i++) {
-    console.log(i, rublePronunciation(i), kopeckPronunciation(i))
-}
+module.exports = { rublePronunciation, kopeckPronunciation }
