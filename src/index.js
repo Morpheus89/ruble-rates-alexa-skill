@@ -3,7 +3,7 @@ const AWS = require('aws-sdk')
 const config = require('config')
 const request = require('request')
 const moment = require('moment')
-const { rublePronunciation, kopeckPronunciation } = require('./ru')
+const { rublePronunciation, kopeckPronunciation, dayPronunciation } = require('./ru')
 
 const makePlainText = Alexa.utils.TextUtils.makePlainText
 const makeImage = Alexa.utils.ImageUtils.makeImage
@@ -19,6 +19,8 @@ const STOP_MESSAGE = 'Goodbye!'
 const Polly = new AWS.Polly()
 const S3 = new AWS.S3()
 const DynamoDB = new AWS.DynamoDB()
+
+const ru = moment().locale('ru')
 
 /*-----------------------------------------------------------------------------
  *  API requests
@@ -85,12 +87,12 @@ const uploadFileToS3 = function(stream) {
     })
 }
 
-const synthesizeSpeech = function(text) {
+const synthesizeSpeech = function(ssmlText) {
     var params = {
         OutputFormat: 'mp3',
-        SampleRate: '16000',
-        Text: text,
-        TextType: 'text',
+        // SampleRate: '16000',
+        Text: ssmlText,
+        TextType: 'ssml',
         VoiceId: 'Maxim',
     }
 
@@ -130,20 +132,38 @@ const randomWish = function(time) {
     return wishes[Math.floor(Math.random() * wishes.length)]
 }
 
-const generateSpeechString = function(greeting, rates, wish) {
-    return `${greeting}. Курс американского доллара составляет ${currencyPronunciation(
-        rates.USD
-    )}, курс евро ${currencyPronunciation(
-        rates.EUR
-    )}, а курс китайской юани ${currencyPronunciation(rates.CNY)}. ${wish}`
-}
-
 const currencyPronunciation = function(amount) {
     const parts = (amount + '').split('.')
 
-    return rublePronunciation(parseInt(parts[0])) + ' ' + kopeckPronunciation(parseInt(parts[1]))
+    return (
+        '<break strength="weak"/>' +
+        rublePronunciation(parseInt(parts[0])) +
+        '<break strength="weak"/>' +
+        kopeckPronunciation(parseInt(parts[1]))
+    )
 }
 
+const generateSpeechString = function(greeting, rates, wish) {
+    const today = ru.format('D MMMM').split(' ')
+
+    const date = `Сегодня ${dayPronunciation(today[0])} ${today[1]}`
+    const day = ru.format('dddd')
+    const dollarRates = `Курс американского доллара составляет ${currencyPronunciation(rates.USD)}`
+    const euroRates = `Курс евро ${currencyPronunciation(rates.EUR)}`
+    const yuanRates = `А курс китайской юани ${currencyPronunciation(rates.CNY)}`
+
+    return `
+    <speak>
+        ${config.get('ssmlEffects')[0]}
+            <p>${greeting}</p>
+            <p>${date} '<break strength="weak"/> ${day}</p>
+            <p>${dollarRates}</p>
+            <p>${euroRates}</p>
+            <p>${yuanRates}</p>
+            <p>${wish}</p>
+        ${config.get('ssmlEffects')[1]}
+    </speak>`
+}
 
 /*-----------------------------------------------------------------------------
  *  Handlers
@@ -164,23 +184,24 @@ const handlers = {
             .then(item => {
                 return new Promise(resolve => {
                     if (item.Item) {
-                        // audio file has already been generated
+                        // 1. audio file has already been generated
                         let audioURL = item.Item.url.S
                         resolve(audioURL)
                     } else {
-                        // no audio for current date
+                        // 2. no audio for current date
                         getRatesFromAPI()
                             .then(apiResponse => {
-                                console.log('---', 'got from api')
                                 // generate all currencies
                                 return Promise.resolve(calcCurrencyRates(apiResponse.rates))
                             })
-                            .then(rates =>
-                                generateSpeechString(randomGreeting(), rates, randomWish())
-                            )
-                            // generate audio using Polly API
+                            .then(rates => {
+                                return generateSpeechString(randomGreeting(), rates, randomWish())
+                            })
+                            // generate audio using Polly API and return stream
                             .then(synthesizeSpeech)
+                            // upload generated file to S3 and return link
                             .then(uploadFileToS3)
+                            // put link for generated file to DynamoDB
                             .then(audioURL => {
                                 putItemToDynamo({
                                     id: {
@@ -193,12 +214,18 @@ const handlers = {
 
                                 resolve(audioURL)
                             })
+                            .catch(err => {
+                                console.log('---', err, err.stack)
+                            })
                     }
                 })
             })
             .then(audioURL => {
                 this.response.audioPlayerPlay('REPLACE_ALL', audioURL, 'audio')
                 this.emit(':responseReady')
+            })
+            .catch(err => {
+                console.log('---', err, err.stack)
             })
     },
     'AMAZON.HelpIntent': function() {
@@ -213,7 +240,7 @@ const handlers = {
         this.emit(':responseReady')
     },
     'AMAZON.StopIntent': function() {
-        this.response.speak(STOP_MESSAGE)
+        this.response.speak(STOP_MESSAGE).audioPlayerPlay()
         this.emit(':responseReady')
     },
 }

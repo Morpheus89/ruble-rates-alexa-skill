@@ -13,6 +13,41 @@ const numbersAlter = [
     'девять',
 ]
 
+const numbersDateOrdinal = [
+    '',
+    'первое',
+    'второе',
+    'третье',
+    'четвертое',
+    'пятое',
+    'шестое',
+    'седьмое',
+    'восьмое',
+    'девятое',
+    'десятое',
+    'одиннадцатое',
+    'двенадцатое',
+    'тринадцатое',
+    'четырнадцатое',
+    'пятнадцатое',
+    'шестнадцатое',
+    'семнадцатое',
+    'восемнадцатое',
+    'девятнадцатое',
+    'двадцатое',
+    'двадцать первое',
+    'двадцать второе',
+    'двадцать третье',
+    'двадцать четвертое',
+    'двадцать пятое',
+    'двадцать шестое',
+    'двадцать седьмое',
+    'двадцать восьмое',
+    'двадцать девятое',
+    'тридцатое',
+    'тридцать первое',
+]
+
 const numbersTens = [
     '',
     'десять',
@@ -111,4 +146,8 @@ const kopeckPronunciation = num => {
     return result
 }
 
-module.exports = { rublePronunciation, kopeckPronunciation }
+const dayPronunciation = num => {
+    return numbersDateOrdinal[num]
+}
+
+module.exports = { rublePronunciation, kopeckPronunciation, dayPronunciation }
