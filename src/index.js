@@ -8,7 +8,7 @@ const { rublePronunciation, kopeckPronunciation, dayPronunciation } = require('.
 const makePlainText = Alexa.utils.TextUtils.makePlainText
 const makeImage = Alexa.utils.ImageUtils.makeImage
 
-const APP_ID = config.get('appID')
+const APP_ID = config.get('API.appID')
 
 const SKILL_NAME = 'Ruble Rates'
 const GET_FACT_MESSAGE = ''
@@ -29,7 +29,7 @@ const ru = moment().locale('ru')
 const getRatesFromAPI = function() {
     return new Promise(resolve => {
         request.get(
-            `${config.get('fixerAPI')}&access_key=${config.get('apiKey')}`,
+            `${config.get('API.fixerAPI')}&access_key=${config.get('API.apiKey')}`,
             (error, response, body) => {
                 if (response.statusCode === 200) {
                     resolve(JSON.parse(body))
@@ -43,7 +43,7 @@ const getRatesFromAPI = function() {
 const getItemFromDynamo = function(item) {
     var params = {
         Key: item,
-        TableName: config.get('dynamoDBTableName'),
+        TableName: config.get('API.dynamoDBTableName'),
     }
 
     return new Promise((resolve, reject) => {
@@ -59,7 +59,7 @@ const putItemToDynamo = function(item) {
     var params = {
         Item: item,
         // ReturnConsumedCapacity: 'TOTAL',
-        TableName: config.get('dynamoDBTableName'),
+        TableName: config.get('API.dynamoDBTableName'),
     }
 
     return new Promise(resolve => {
@@ -74,7 +74,7 @@ const putItemToDynamo = function(item) {
 const uploadFileToS3 = function(stream) {
     const params = {
         ACL: 'public-read',
-        Bucket: config.get('s3BucketName'),
+        Bucket: config.get('API.s3BucketName'),
         Key: `briefings/${moment().format('YYYYMMDD')}.mp3`,
         Body: stream,
     }
@@ -123,12 +123,12 @@ const roundCurrencyRate = function(rate) {
 }
 
 const randomGreeting = function(time) {
-    const greetings = config.get('greetings')
+    const greetings = config.get('Greetings')
     return greetings[Math.floor(Math.random() * greetings.length)]
 }
 
 const randomWish = function(time) {
-    const wishes = config.get('wishes')
+    const wishes = config.get('Wishes')
     return wishes[Math.floor(Math.random() * wishes.length)]
 }
 
@@ -154,14 +154,14 @@ const generateSpeechString = function(greeting, rates, wish) {
 
     return `
     <speak>
-        ${config.get('ssmlEffects')[0]}
+        ${config.get('SSMLEffects')[0]}
             <p>${greeting}</p>
             <p>${date} '<break strength="weak"/> ${day}</p>
             <p>${dollarRates}</p>
             <p>${euroRates}</p>
             <p>${yuanRates}</p>
             <p>${wish}</p>
-        ${config.get('ssmlEffects')[1]}
+        ${config.get('SSMLEffects')[1]}
     </speak>`
 }
 
