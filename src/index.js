@@ -8,7 +8,13 @@ const { rublePronunciation, kopeckPronunciation, dayPronunciation } = require('.
 const makePlainText = Alexa.utils.TextUtils.makePlainText
 const makeImage = Alexa.utils.ImageUtils.makeImage
 
-const APP_ID = config.get('API.appID')
+const APP_ID = process.env['APP_ID']
+const FIXER_API_URL = process.env['FIXER_API_URL']
+const FIXER_API_KEY = process.env['FIXER_API_KEY']
+const S3_BUCKET_NAME = process.env['S3_BUCKET_NAME']
+const DDB_TABLE_NAME = process.env['DDB_TABLE_NAME']
+
+console.log('---', APP_ID, FIXER_API_KEY, FIXER_API_URL, S3_BUCKET_NAME, DDB_TABLE_NAME)
 
 const SKILL_NAME = 'Ruble Rates'
 const GET_FACT_MESSAGE = ''
@@ -29,7 +35,7 @@ const ru = moment().locale('ru')
 const getRatesFromAPI = function() {
     return new Promise(resolve => {
         request.get(
-            `${config.get('API.fixerAPI')}&access_key=${config.get('API.apiKey')}`,
+            `${FIXER_API_URL}&access_key=${FIXER_API_KEY}`,
             (error, response, body) => {
                 if (response.statusCode === 200) {
                     resolve(JSON.parse(body))
@@ -43,7 +49,7 @@ const getRatesFromAPI = function() {
 const getItemFromDynamo = function(item) {
     var params = {
         Key: item,
-        TableName: config.get('API.dynamoDBTableName'),
+        TableName: DDB_TABLE_NAME,
     }
 
     return new Promise((resolve, reject) => {
@@ -58,8 +64,7 @@ const getItemFromDynamo = function(item) {
 const putItemToDynamo = function(item) {
     var params = {
         Item: item,
-        // ReturnConsumedCapacity: 'TOTAL',
-        TableName: config.get('API.dynamoDBTableName'),
+        TableName: DDB_TABLE_NAME,
     }
 
     return new Promise(resolve => {
@@ -74,7 +79,7 @@ const putItemToDynamo = function(item) {
 const uploadFileToS3 = function(stream) {
     const params = {
         ACL: 'public-read',
-        Bucket: config.get('API.s3BucketName'),
+        Bucket: S3_BUCKET_NAME,
         Key: `briefings/${moment().format('YYYYMMDD')}.mp3`,
         Body: stream,
     }
@@ -90,7 +95,6 @@ const uploadFileToS3 = function(stream) {
 const synthesizeSpeech = function(ssmlText) {
     var params = {
         OutputFormat: 'mp3',
-        // SampleRate: '16000',
         Text: ssmlText,
         TextType: 'ssml',
         VoiceId: 'Maxim',
@@ -134,6 +138,9 @@ const randomWish = function(time) {
 
 const currencyPronunciation = function(amount) {
     const parts = (amount + '').split('.')
+
+    // add ending 0 for correct kopeck pronunciation
+    if (parts[1].length === 1) parts[1] += '0'
 
     return (
         '<break strength="weak"/>' +
@@ -246,6 +253,9 @@ const handlers = {
 }
 
 exports.handler = function(event, context, callback) {
+    // console.log('---', event)
+    // console.log('---', context)
+
     const alexa = Alexa.handler(event, context, callback)
     alexa.APP_ID = APP_ID
     alexa.registerHandlers(handlers)

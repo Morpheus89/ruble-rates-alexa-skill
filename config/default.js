@@ -1,5 +1,4 @@
 module.exports = {
-    API: require('./api'),
     Greetings: [
         'Большой привет',
         'Здравствуйте',
